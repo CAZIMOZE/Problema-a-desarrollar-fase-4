@@ -15,7 +15,7 @@ import os
 import re
 
 
-#Parte 1: SISTEMA DE REGISTRO DE EVENTOS Y ERRORES (LOGS)
+#Parte : SISTEMA DE REGISTRO DE EVENTOS Y ERRORES (LOGS)
 
 
 class GestorLogs:
@@ -64,3 +64,52 @@ class GestorLogs:
     def error(self, mensaje: str) -> None:
         #Atajo para registrar excepciones, validaciones fallidas o errores.
         self.registrar("ERROR", mensaje)
+
+#Parte 2: JERARQUÍA DE EXCEPCIONES PERSONALIZADAS
+
+class SoftwareFJError(Exception):
+    #Excepción base de todo el sistema Software FJ.
+    #Permite capturar cualquier error de negocio del sistema de forma unificada
+    #y conservar la marca de tiempo del incidente.
+    
+    def __init__(self, mensaje: str, codigo: str = "ERR-GENERAL"):
+        self.mensaje = mensaje
+        self.codigo = codigo
+        self.fecha_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        super().__init__(f"[{self.codigo}] {self.mensaje}")
+
+
+class DatosInvalidosError(SoftwareFJError):
+    #Se lanza cuando un cliente, servicio o reserva recibe datos con formato o valor inválido."""
+    def __init__(self, mensaje: str):
+        super().__init__(mensaje, codigo="ERR-DATOS")
+
+
+class ParametroFaltanteError(SoftwareFJError):
+    #Se lanza cuando se omite un dato obligatorio requerido para operar."""
+    def __init__(self, mensaje: str):
+        super().__init__(mensaje, codigo="ERR-PARAMETRO")
+
+
+class ServicioNoDisponibleError(SoftwareFJError):
+    #Se lanza cuando se intenta reservar una sala, equipo o asesoría sin cupo o inactiva."""
+    def __init__(self, mensaje: str):
+        super().__init__(mensaje, codigo="ERR-DISPONIBILIDAD")
+
+
+class ReservaInvalidaError(SoftwareFJError):
+    #Se lanza ante intentos de reserva incorrectos (duración nula, cliente inexistente, etc.)."""
+    def __init__(self, mensaje: str):
+        super().__init__(mensaje, codigo="ERR-RESERVA")
+
+
+class OperacionNoPermitidaError(SoftwareFJError):
+    #Se lanza al intentar transiciones de estado ilegales (ej. cancelar una reserva ya cancelada)."""
+    def __init__(self, mensaje: str):
+        super().__init__(mensaje, codigo="ERR-OPERACION")
+
+
+class CalculoInconsistenteError(SoftwareFJError):
+    #Se lanza cuando un cálculo de tarifas, impuestos o descuentos da un resultado incoherente."""
+    def __init__(self, mensaje: str):
+        super().__init__(mensaje, codigo="ERR-CALCULO")
