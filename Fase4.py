@@ -113,3 +113,27 @@ class CalculoInconsistenteError(SoftwareFJError):
     #Se lanza cuando un cálculo de tarifas, impuestos o descuentos da un resultado incoherente."""
     def __init__(self, mensaje: str):
         super().__init__(mensaje, codigo="ERR-CALCULO")
+
+
+# FASE 4: CLASE ABSTRACTA BASE (ENTIDAD DEL SISTEMA)
+
+class EntidadSistema(ABC):
+    #Clase abstracta base para todas las entidades del software (Clientes, Servicios, etc.).
+    #Aplica el principio de Abstracción y encapsula atributos comunes como el ID.
+    
+    
+    def __init__(self, id_entidad: str):
+        if not id_entidad or not id_entidad.strip():
+            raise ParametroFaltanteError("El identificador de la entidad no puede estar vacío.")
+        self.__id_entidad = id_entidad.strip()
+
+    @property
+    def id_entidad(self) -> str:
+        #Permite consultar el ID de forma segura mediante encapsulación (getter)."""
+        return self.__id_entidad
+
+    @abstractmethod
+    def obtener_resumen(self) -> str:
+        #Método abstracto obligatorio. 
+        #Cada clase hija debe implementar su propia versión para retornar los detalles.
+        pass
