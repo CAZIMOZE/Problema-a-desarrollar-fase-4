@@ -15,7 +15,7 @@ import os
 import re
 
 
-#Parte : SISTEMA DE REGISTRO DE EVENTOS Y ERRORES (LOGS)
+#Parte 2 : SISTEMA DE REGISTRO DE EVENTOS Y ERRORES (LOGS)
 
 
 class GestorLogs:
@@ -65,7 +65,7 @@ class GestorLogs:
         #Atajo para registrar excepciones, validaciones fallidas o errores.
         self.registrar("ERROR", mensaje)
 
-#Parte 2: JERARQUÍA DE EXCEPCIONES PERSONALIZADAS
+#Parte 3: JERARQUÍA DE EXCEPCIONES PERSONALIZADAS
 
 class SoftwareFJError(Exception):
     #Excepción base de todo el sistema Software FJ.
@@ -115,7 +115,7 @@ class CalculoInconsistenteError(SoftwareFJError):
         super().__init__(mensaje, codigo="ERR-CALCULO")
 
 
-# FASE 4: CLASE ABSTRACTA BASE (ENTIDAD DEL SISTEMA)
+#Parte 4: CLASE ABSTRACTA BASE (ENTIDAD DEL SISTEMA)
 
 class EntidadSistema(ABC):
     #Clase abstracta base para todas las entidades del software (Clientes, Servicios, etc.).
@@ -137,3 +137,51 @@ class EntidadSistema(ABC):
         #Método abstracto obligatorio. 
         #Cada clase hija debe implementar su propia versión para retornar los detalles.
         pass
+
+ 
+#Parte 5: CLASE CLIENTE (HERENCIA DE ENTIDAD Y VALIDACIONES ESTRICTAS)
+
+class Cliente(EntidadSistema):
+    #Representa a un cliente dentro de Software FJ.
+    #Hereda de EntidadSistema e implementa validaciones estrictas de datos personales.
+        
+    def __init__(self, id_cliente: str, nombre: str, correo: str, telefono: str):
+        super().__init__(id_cliente)
+        
+        #Valida y asigna nombre
+        if not nombre or not nombre.strip():
+            raise ParametroFaltanteError("El nombre del cliente es obligatorio.")
+        self.__nombre = nombre.strip()
+        
+        #Valida el formato de correo electrónico mediante expresiones regulares
+        if not correo or not correo.strip():
+            raise ParametroFaltanteError("El correo electrónico es obligatorio.")
+        patron_correo = r"^[\w\.-]+@[\w\.-]+\.\w+$"
+        if not re.match(patron_correo, correo.strip()):
+            raise DatosInvalidosError(f"El formato del correo electrónico '{correo}' no es válido.")
+        self.__correo = correo.strip().lower()
+        
+        #Valida teléfono (mínimo 7 dígitos numéricos)
+        if not telefono or not telefono.strip():
+            raise ParametroFaltanteError("El teléfono del cliente es obligatorio.")
+        telefono_limpio = re.sub(r"\D", "", telefono) # Elimina espacios, guiones o símbolos
+        if len(telefono_limpio) < 7:
+            raise DatosInvalidosError(f"El teléfono '{telefono}' debe contener al menos 7 dígitos válidos.")
+        self.__telefono = telefono_limpio
+
+    @property
+    def nombre(self) -> str:
+        return self.__nombre
+
+    @property
+    def correo(self) -> str:
+        return self.__correo
+
+    @property
+    def telefono(self) -> str:
+        return self.__telefono
+
+    def obtener_resumen(self) -> str:
+        #Implementación obligatoria del método abstracto de EntidadSistema."""
+        return (f"Cliente [ID: {self.id_entidad}] | Nombre: {self.__nombre} | "
+                f"Correo: {self.__correo} | Teléfono: {self.__telefono}")
