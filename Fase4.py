@@ -344,3 +344,138 @@ class ReservaSala(Servicio):
             f"{base_resumen} | Tipo: Reserva de Sala | "
             f"Capacidad: {self.__capacidad_maxima} personas | {av_texto}"
         )
+
+
+# Parte 8: SERVICIO ESPECIALIZADO ALQUILER DE EQUIPO
+
+class AlquilerEquipo(Servicio):
+    #Servicio especializado para el alquiler de equipos tecnológicos.
+    #Hereda de Servicio e incorpora control de stock y seguro obligatorio.
+
+    def __init__(
+        self,
+        id_servicio: str,
+        nombre: str,
+        tarifa_base: float,
+        stock_total: int,
+        costo_seguro_unidad: float = 0.0,
+        stock_disponible: int | None = None,
+        disponible: bool = True,
+    ):
+        super().__init__(id_servicio, nombre, tarifa_base, disponible)
+
+        if stock_total is None or stock_total <= 0:
+            raise DatosInvalidosError(
+                f"El stock total del equipo '{self.nombre}' debe ser mayor que cero."
+            )
+        if costo_seguro_unidad is None or costo_seguro_unidad < 0:
+            raise DatosInvalidosError(
+                f"El costo del seguro por unidad para '{self.nombre}' no puede ser negativo."
+            )
+
+        self.__stock_total = int(stock_total)
+        self.__costo_seguro_unidad = float(costo_seguro_unidad)
+
+        if stock_disponible is None:
+            self.__stock_disponible = self.__stock_total
+        else:
+            if stock_disponible < 0 or stock_disponible > self.__stock_total:
+                raise DatosInvalidosError(
+                    f"El stock disponible ({stock_disponible}) para '{self.nombre}' "
+                    f"debe estar entre 0 y {self.__stock_total}."
+                )
+            self.__stock_disponible = int(stock_disponible)
+
+    @property
+    def stock_total(self) -> int:
+        return self.__stock_total
+
+    @property
+    def stock_disponible(self) -> int:
+        return self.__stock_disponible
+
+    @property
+    def costo_seguro_unidad(self) -> float:
+        return self.__costo_seguro_unidad
+
+    def reservar_unidades(self, cantidad: int) -> None:
+        #Descuenta unidades del stock disponible de forma controlada.
+        self.verificar_disponibilidad(cantidad)
+        self.__stock_disponible -= int(cantidad)
+        if self.__stock_disponible == 0:
+            self.cambiar_disponibilidad(False)
+
+    def liberar_unidades(self, cantidad: int) -> None:
+        #Devuelve unidades al stock disponible tras finalizar o cancelar una reserva.
+        if cantidad is None or cantidad <= 0:
+            raise DatosInvalidosError("La cantidad a liberar debe ser mayor que cero.")
+        if self.__stock_disponible + int(cantidad) > self.__stock_total:
+            raise OperacionNoPermitidaError(
+                f"No se pueden liberar {cantidad} unidades de '{self.nombre}': "
+                f"superaría el stock total ({self.__stock_total})."
+            )
+        self.__stock_disponible += int(cantidad)
+        if self.__stock_disponible > 0:
+            self.cambiar_disponibilidad(True)
+
+    def verificar_disponibilidad(self, cantidad: int = 1) -> bool:
+        #Verifica si el servicio está activo y hay suficiente stock para la cantidad solicitada.
+        if cantidad is None or cantidad <= 0:
+            raise DatosInvalidosError("La cantidad de equipos a consultar debe ser mayor que cero.")
+
+        if not self.disponible or self.__stock_disponible <= 0:
+            raise ServicioNoDisponibleError(
+                f"El equipo '{self.nombre}' [ID: {self.id_entidad}] no tiene stock disponible."
+            )
+
+        if int(cantidad) > self.__stock_disponible:
+            raise ServicioNoDisponibleError(
+                f"Stock insuficiente para '{self.nombre}': disponibles {self.__stock_disponible}, "
+                f"solicitados {cantidad}."
+            )
+
+        return True
+
+    def calcular_costo(self, unidades: float, **kwargs) -> float:
+        #Calcula el costo total del alquiler según días/horas (unidades), cantidad de equipos
+        #y seguro obligatorio por unidad.
+        #Soporta 'cantidad_equipos' (int), 'seguro_unidad' (float) y 'descuento_porcentaje' (float).
+        
+        if unidades is None or unidades <= 0:
+            raise DatosInvalidosError("La duración del alquiler debe ser mayor que cero.")
+
+        cantidad_equipos = int(kwargs.get("cantidad_equipos", 1))
+        if cantidad_equipos <= 0:
+            raise DatosInvalidosError("La cantidad de equipos a alquilar debe ser mayor que cero.")
+
+        seguro_unidad = float(kwargs.get("seguro_unidad", self.__costo_seguro_unidad))
+        if seguro_unidad < 0:
+            raise CalculoInconsistenteError(
+                "El costo del seguro por unidad no puede ser negativo."
+            )
+
+        descuento_porcentaje = float(kwargs.get("descuento_porcentaje", 0.0))
+        if descuento_porcentaje < 0 or descuento_porcentaje >= 100:
+            raise CalculoInconsistenteError(
+                f"El porcentaje de descuento '{descuento_porcentaje}' es inconsistente."
+            )
+
+        subtotal_alquiler = float(unidades) * self.tarifa_base * cantidad_equipos
+        subtotal_seguro = seguro_unidad * cantidad_equipos
+        total = (subtotal_alquiler + subtotal_seguro) * (1 - (descuento_porcentaje / 100.0))
+
+        if total <= 0:
+            raise CalculoInconsistenteError(
+                "El cálculo del costo de alquiler de equipo produjo un valor no válido."
+            )
+
+        return round(total, 2)
+
+    def obtener_resumen(self) -> str:
+        #Retorna el resumen del equipo con inventario y seguro obligatorio.
+        base_resumen = super().obtener_resumen()
+        return (
+            f"{base_resumen} | Tipo: Alquiler de Equipo | "
+            f"Stock: {self.__stock_disponible}/{self.__stock_total} | "
+            f"Seguro/unidad: ${self.__costo_seguro_unidad:,.2f}"
+        )
