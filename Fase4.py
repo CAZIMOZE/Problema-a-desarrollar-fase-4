@@ -1202,3 +1202,58 @@ def ejecutar_simulacion_integral() -> SistemaSoftwareFJ:
     print(f"[OK 12] Pruebas de bordes completadas: {exitosas}/{len(pruebas)} exitosas")
 
     return sistema
+
+
+#Parte 14: AUDITORÍA FINAL DE LOGS Y PUNTO DE ENTRADA DEL SISTEMA
+
+def auditar_archivo_logs(sistema: SistemaSoftwareFJ) -> dict[str, int]:
+    #Audita el archivo de logs generado durante la ejecución y contabiliza
+    #los registros por nivel (INFO, WARN, ERROR).
+    resumen_niveles: dict[str, int] = {"INFO": 0, "WARN": 0, "ERROR": 0, "OTROS": 0}
+    gestor_logs = sistema._SistemaSoftwareFJ__logs
+    ruta_log = gestor_logs._GestorLogs__ruta_archivo
+
+    print("\n--- AUDITORÍA FINAL DEL ARCHIVO DE LOGS ---")
+    if not os.path.exists(ruta_log):
+        print(f"No se encontró el archivo de log en: {ruta_log}")
+        return resumen_niveles
+
+    archivo = None
+    try:
+        archivo = open(ruta_log, mode="r", encoding="utf-8")
+        lineas = archivo.readlines()
+
+        for linea in lineas:
+            if "[INFO]" in linea:
+                resumen_niveles["INFO"] += 1
+            elif "[WARN]" in linea:
+                resumen_niveles["WARN"] += 1
+            elif "[ERROR]" in linea:
+                resumen_niveles["ERROR"] += 1
+            else:
+                resumen_niveles["OTROS"] += 1
+
+        print(f"Archivo auditado: {ruta_log} | Total de líneas: {len(lineas)}")
+        print(
+            f"Conteo -> INFO: {resumen_niveles['INFO']} | "
+            f"WARN: {resumen_niveles['WARN']} | "
+            f"ERROR: {resumen_niveles['ERROR']}"
+        )
+        gestor_logs.registrar_evento(
+            "INFO",
+            f"Auditoría final completada ({len(lineas)} líneas; "
+            f"ERROR={resumen_niveles['ERROR']}, WARN={resumen_niveles['WARN']}).",
+        )
+    except OSError as exc:
+        print(f"Error al auditar el archivo de logs '{ruta_log}': {exc}")
+    finally:
+        if archivo is not None and not archivo.closed:
+            archivo.close()
+
+    return resumen_niveles
+
+
+if __name__ == "__main__":
+    sistema_fj = ejecutar_simulacion_integral()
+    print("\n" + sistema_fj.obtener_estado_general())
+    auditar_archivo_logs(sistema_fj)
