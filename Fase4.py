@@ -632,7 +632,7 @@ class AsesoriaEspecializada(Servicio):
         )
 
 
-# FASE 10: CLASE RESERVA (CONTROL DE ESTADOS Y ENCADENAMIENTO DE EXCEPCIONES)
+#Parte 10: CLASE RESERVA (CONTROL DE ESTADOS Y ENCADENAMIENTO DE EXCEPCIONES)
 
 class Reserva:
     #Representa una reserva de servicio realizada por un cliente dentro de Software FJ.
@@ -767,3 +767,283 @@ class Reserva:
             f"Servicio: {self.__servicio.nombre} | Unidades: {self.__unidades} | "
             f"Cantidad: {self.__cantidad} | Total: ${self.__costo_total:,.2f}"
         )
+
+
+# Parte 11: MOTOR CENTRAL SISTEMA SOFTWARE FJ (GESTIÓN EN MEMORIA Y LOGS)
+
+class SistemaSoftwareFJ:
+    #Motor central en memoria de Software FJ.
+    #Coordina clientes, servicios, reservas y registro de eventos/errores en GestorLogs.
+
+    def __init__(self, gestor_logs: GestorLogs | None = None):
+        self.__logs = gestor_logs if isinstance(gestor_logs, GestorLogs) else GestorLogs()
+        self.__clientes: dict[str, Cliente] = {}
+        self.__servicios: dict[str, Servicio] = {}
+        self.__reservas: dict[str, Reserva] = {}
+        self.__logs.registrar_evento("INFO", "SistemaSoftwareFJ inicializado correctamente.")
+
+    @property
+    def clientes(self) -> dict[str, Cliente]:
+        return dict(self.__clientes)
+
+    @property
+    def servicios(self) -> dict[str, Servicio]:
+        return dict(self.__servicios)
+
+    @property
+    def reservas(self) -> dict[str, Reserva]:
+        return dict(self.__reservas)
+
+    def _registrar_excepcion(self, contexto: str, exc: Exception) -> None:
+        #Registra una excepción y su causa encadenada (si existe) en el archivo de logs.
+        detalle = f"{contexto} -> {type(exc).__name__}: {exc}"
+        if getattr(exc, "__cause__", None) is not None:
+            causa = exc.__cause__
+            detalle += f" | Causa raíz: {type(causa).__name__}: {causa}"
+        self.__logs.registrar_evento("ERROR", detalle)
+
+    def registrar_cliente(self, cliente: Cliente) -> Cliente:
+        #Registra un nuevo cliente en memoria validando duplicados por ID.
+        try:
+            if not isinstance(cliente, Cliente):
+                raise DatosInvalidosError("Solo se pueden registrar objetos de tipo Cliente.")
+
+            if cliente.id_entidad in self.__clientes:
+                raise OperacionNoPermitidaError(
+                    f"Ya existe un cliente registrado con el ID '{cliente.id_entidad}'."
+                )
+
+            self.__clientes[cliente.id_entidad] = cliente
+            self.__logs.registrar_evento(
+                "INFO", f"Cliente registrado: {cliente.id_entidad} - {cliente.nombre}"
+            )
+            return cliente
+        except SoftwareFJError as exc:
+            self._registrar_excepcion("Fallo al registrar cliente", exc)
+            raise
+
+    def registrar_servicio(self, servicio: Servicio) -> Servicio:
+        #Registra un servicio especializado en memoria validando duplicados por ID.
+        try:
+            if not isinstance(servicio, Servicio):
+                raise DatosInvalidosError("Solo se pueden registrar objetos de tipo Servicio.")
+
+            if servicio.id_entidad in self.__servicios:
+                raise OperacionNoPermitidaError(
+                    f"Ya existe un servicio registrado con el ID '{servicio.id_entidad}'."
+                )
+
+            self.__servicios[servicio.id_entidad] = servicio
+            self.__logs.registrar_evento(
+                "INFO",
+                f"Servicio registrado: {servicio.id_entidad} - {servicio.nombre} ({type(servicio).__name__})",
+            )
+            return servicio
+        except SoftwareFJError as exc:
+            self._registrar_excepcion("Fallo al registrar servicio", exc)
+            raise
+
+    def crear_reserva(
+        self,
+        id_reserva: str,
+        id_cliente: str,
+        id_servicio: str,
+        unidades: float,
+        cantidad: int = 1,
+        **parametros_costo,
+    ) -> Reserva:
+        #Crea y almacena una reserva validando existencia de cliente, servicio e ID único.
+        try:
+            if not id_reserva or not id_reserva.strip():
+                raise ParametroFaltanteError("El ID de la reserva es obligatorio.")
+
+            id_reserva_limpio = id_reserva.strip()
+            if id_reserva_limpio in self.__reservas:
+                raise OperacionNoPermitidaError(
+                    f"Ya existe una reserva registrada con el ID '{id_reserva_limpio}'."
+                )
+
+            if id_cliente not in self.__clientes:
+                raise ReservaInvalidaError(
+                    f"No se puede crear la reserva '{id_reserva_limpio}': el cliente '{id_cliente}' no existe."
+                )
+
+            if id_servicio not in self.__servicios:
+                raise ReservaInvalidaError(
+                    f"No se puede crear la reserva '{id_reserva_limpio}': el servicio '{id_servicio}' no existe."
+                )
+
+            cliente = self.__clientes[id_cliente]
+            servicio = self.__servicios[id_servicio]
+
+            reserva = Reserva(
+                id_reserva=id_reserva_limpio,
+                cliente=cliente,
+                servicio=servicio,
+                unidades=unidades,
+                cantidad=cantidad,
+                **parametros_costo,
+            )
+
+            self.__reservas[id_reserva_limpio] = reserva
+            self.__logs.registrar_evento(
+                "INFO",
+                f"Reserva creada: {reserva.id_reserva} | Cliente: {cliente.id_entidad} | "
+                f"Servicio: {servicio.id_entidad} | Total: ${reserva.costo_total:,.2f}",
+            )
+            return reserva
+        except SoftwareFJError as exc:
+            self._registrar_excepcion(f"Fallo al crear reserva '{id_reserva}'", exc)
+            raise
+
+    def confirmar_reserva(self, id_reserva: str) -> Reserva:
+        #Confirma una reserva existente y registra el evento o error en los logs.
+        try:
+            if id_reserva not in self.__reservas:
+                raise ReservaInvalidaError(f"La reserva '{id_reserva}' no existe en el sistema.")
+
+            reserva = self.__reservas[id_reserva]
+            reserva.confirmar()
+            self.__logs.registrar_evento(
+                "INFO",
+                f"Reserva confirmada: {reserva.id_reserva} | Estado: {reserva.estado} | "
+                f"Total: ${reserva.costo_total:,.2f}",
+            )
+            return reserva
+        except SoftwareFJError as exc:
+            self._registrar_excepcion(f"Fallo al confirmar reserva '{id_reserva}'", exc)
+            raise
+
+    def cancelar_reserva(self, id_reserva: str) -> Reserva:
+        #Cancela una reserva existente y registra la operación o el error en los logs.
+        try:
+            if id_reserva not in self.__reservas:
+                raise ReservaInvalidaError(f"La reserva '{id_reserva}' no existe en el sistema.")
+
+            reserva = self.__reservas[id_reserva]
+            reserva.cancelar()
+            self.__logs.registrar_evento(
+                "INFO",
+                f"Reserva cancelada: {reserva.id_reserva} | Estado: {reserva.estado}",
+            )
+            return reserva
+        except SoftwareFJError as exc:
+            self._registrar_excepcion(f"Fallo al cancelar reserva '{id_reserva}'", exc)
+            raise
+
+    def obtener_estado_general(self) -> str:
+        #Genera un resumen consolidado del estado actual del sistema en memoria.
+        lineas = [
+            "=== RESUMEN GENERAL - SISTEMA SOFTWARE FJ ===",
+            f"Clientes registrados: {len(self.__clientes)}",
+            f"Servicios registrados: {len(self.__servicios)}",
+            f"Reservas registradas: {len(self.__reservas)}",
+            "--- Servicios ---",
+        ]
+        for srv in self.__servicios.values():
+            lineas.append(f"  * {srv.obtener_resumen()}")
+
+        lineas.append("--- Reservas ---")
+        for res in self.__reservas.values():
+            lineas.append(f"  * {res.obtener_resumen()}")
+
+        return "\n".join(lineas)
+
+
+#Parte 12: PRUEBAS DE BORDES Y VERIFICACIÓN DE EXCEPCIONES ENCADENADAS
+
+def ejecutar_pruebas_bordes(sistema: SistemaSoftwareFJ) -> list[dict[str, str]]:
+    #Ejecuta pruebas de casos límite y verifica el encadenamiento de excepciones
+    #registrando cada resultado en el gestor de logs del sistema.
+    resultados: list[dict[str, str]] = []
+
+    def _probar(nombre_caso: str, accion) -> None:
+        try:
+            accion()
+            mensaje = f"[FALLO DE PRUEBA] '{nombre_caso}' no lanzó la excepción esperada."
+            sistema._SistemaSoftwareFJ__logs.registrar_evento("WARN", mensaje)
+            resultados.append({"caso": nombre_caso, "estado": "FALLO", "detalle": mensaje})
+        except SoftwareFJError as exc:
+            causa_nombre = type(exc.__cause__).__name__ if exc.__cause__ else "Ninguna"
+            detalle = (
+                f"Capturada {type(exc).__name__} ({exc.codigo}) | "
+                f"Causa encadenada: {causa_nombre} | Mensaje: {exc}"
+            )
+            resultados.append({"caso": nombre_caso, "estado": "OK", "detalle": detalle})
+
+    # 1. Cliente con ID vacío y correo/teléfono inválidos
+    _probar(
+        "Cliente con ID vacío",
+        lambda: Cliente("", "Ana Torres", "ana@correo.com", "3001234567"),
+    )
+    _probar(
+        "Cliente con correo inválido",
+        lambda: Cliente("CLI-B1", "Ana Torres", "correo_sin_arroba", "3001234567"),
+    )
+    _probar(
+        "Cliente con teléfono corto",
+        lambda: Cliente("CLI-B2", "Ana Torres", "ana@correo.com", "123"),
+    )
+
+    # 2. Servicios con valores límite inválidos
+    _probar(
+        "Sala con tarifa base cero",
+        lambda: ReservaSala("SAL-B1", "Sala Cero", 0, capacidad_maxima=10),
+    )
+    _probar(
+        "Equipo con stock negativo",
+        lambda: AlquilerEquipo("EQ-B1", "Laptop", 50000, stock_total=-2),
+    )
+    _probar(
+        "Asesoría con complejidad inexistente",
+        lambda: AsesoriaEspecializada("ASE-B1", "Consultoría", 80000, nivel_complejidad="EXTREMA"),
+    )
+
+    # 3. Excepción encadenada por exceso de capacidad en sala
+    cliente_prueba = Cliente("CLI-TEST", "Carlos Ruiz", "carlos@empresa.com", "3109876543")
+    sala_pequena = ReservaSala(
+        "SAL-TEST", "Sala Pequeña", 40000, capacidad_maxima=5, tiene_audiovisual=False
+    )
+    sistema.registrar_cliente(cliente_prueba)
+    sistema.registrar_servicio(sala_pequena)
+
+    def _crear_reserva_exceso_cupo():
+        try:
+            sistema.crear_reserva(
+                id_reserva="RES-EXCESO",
+                id_cliente="CLI-TEST",
+                id_servicio="SAL-TEST",
+                unidades=2,
+                cantidad=12,
+            )
+        except ReservaInvalidaError as exc:
+            assert isinstance(exc.__cause__, ServicioNoDisponibleError), (
+                "Se esperaba ServicioNoDisponibleError encadenada en __cause__"
+            )
+            raise
+
+    _probar("Encadenamiento ReservaInvalidaError <- ServicioNoDisponibleError", _crear_reserva_exceso_cupo)
+
+    # 4. Transición de estado inválida en reserva (cancelar dos veces)
+    reserva_valida = sistema.crear_reserva(
+        id_reserva="RES-VALIDA-B",
+        id_cliente="CLI-TEST",
+        id_servicio="SAL-TEST",
+        unidades=1,
+        cantidad=3,
+    )
+    sistema.confirmar_reserva("RES-VALIDA-B")
+    sistema.cancelar_reserva("RES-VALIDA-B")
+    _probar(
+        "Cancelar una reserva ya cancelada",
+        lambda: sistema.cancelar_reserva("RES-VALIDA-B"),
+    )
+    _probar(
+        "Confirmar una reserva ya cancelada",
+        lambda: reserva_valida.confirmar(),
+    )
+
+    sistema._SistemaSoftwareFJ__logs.registrar_evento(
+        "INFO", f"Pruebas de bordes ejecutadas: {len(resultados)} casos evaluados."
+    )
+    return resultados
