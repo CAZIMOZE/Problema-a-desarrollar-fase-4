@@ -1047,3 +1047,158 @@ def ejecutar_pruebas_bordes(sistema: SistemaSoftwareFJ) -> list[dict[str, str]]:
         "INFO", f"Pruebas de bordes ejecutadas: {len(resultados)} casos evaluados."
     )
     return resultados
+
+
+#Parte 13: SIMULACIÓN INTEGRAL DE OPERACIONES (10+ CASOS VÁLIDOS E INVÁLIDOS)
+
+def ejecutar_simulacion_integral() -> SistemaSoftwareFJ:
+    #Ejecuta una simulación integral con más de 10 operaciones válidas e inválidas
+    #sobre clientes, servicios y reservas en memoria, registrando todo en logs.
+    gestor_logs = GestorLogs(carpeta="logs", nombre_archivo="software_fj.log")
+    sistema = SistemaSoftwareFJ(gestor_logs=gestor_logs)
+
+    print("\n--- INICIANDO SIMULACIÓN INTEGRAL (SOFTWARE FJ) ---")
+
+    # Operación 1 [VÁLIDA]: Registrar clientes
+    c1 = sistema.registrar_cliente(
+        Cliente("CLI-01", "Laura Méndez", "laura.mendez@empresa.com", "3014567890")
+    )
+    c2 = sistema.registrar_cliente(
+        Cliente("CLI-02", "Andrés Gómez", "andres.gomez@correo.org", "3157890123")
+    )
+    print(f"[OK 1] Clientes registrados: {c1.nombre}, {c2.nombre}")
+
+    # Operación 2 [INVÁLIDA]: Registrar cliente con ID duplicado
+    try:
+        sistema.registrar_cliente(
+            Cliente("CLI-01", "Laura Duplicada", "dup@empresa.com", "3014567890")
+        )
+    except SoftwareFJError as exc:
+        print(f"[ERR 2 esperado] {exc}")
+
+    # Operación 3 [INVÁLIDA]: Registrar cliente con correo inválido
+    try:
+        sistema.registrar_cliente(
+            Cliente("CLI-03", "Pedro Inválido", "pedro_sin_dominio", "3201112233")
+        )
+    except SoftwareFJError as exc:
+        print(f"[ERR 3 esperado] {exc}")
+
+    # Operación 4 [VÁLIDA]: Registrar servicios especializados (Sala, Equipo, Asesoría)
+    sala_auditorio = sistema.registrar_servicio(
+        ReservaSala(
+            id_servicio="SRV-SALA-1",
+            nombre="Sala Conferencias Norte",
+            tarifa_base=120000,
+            capacidad_maxima=30,
+            tiene_audiovisual=True,
+            recargo_audiovisual=0.15,
+        )
+    )
+    equipo_laptops = sistema.registrar_servicio(
+        AlquilerEquipo(
+            id_servicio="SRV-EQ-1",
+            nombre="Estación Portátil Ingeniería",
+            tarifa_base=45000,
+            stock_total=6,
+            costo_seguro_unidad=8000,
+        )
+    )
+    asesoria_arq = sistema.registrar_servicio(
+        AsesoriaEspecializada(
+            id_servicio="SRV-ASE-1",
+            nombre="Arquitectura de Sistemas y POO",
+            tarifa_base=150000,
+            nivel_complejidad="AVANZADA",
+            recargo_urgencia=0.25,
+            cupo_maximo_sesiones=5,
+        )
+    )
+    print(
+        f"[OK 4] Servicios registrados: {sala_auditorio.id_entidad}, "
+        f"{equipo_laptops.id_entidad}, {asesoria_arq.id_entidad}"
+    )
+
+    # Operación 5 [VÁLIDA]: Crear y confirmar reserva de sala con audiovisual y descuento
+    res1 = sistema.crear_reserva(
+        id_reserva="RES-01",
+        id_cliente="CLI-01",
+        id_servicio="SRV-SALA-1",
+        unidades=3,
+        cantidad=20,
+        incluir_audiovisual=True,
+        descuento_porcentaje=10,
+    )
+    sistema.confirmar_reserva("RES-01")
+    print(f"[OK 5] {res1.obtener_resumen()}")
+
+    # Operación 6 [VÁLIDA]: Crear y confirmar alquiler de equipos (descuenta stock)
+    res2 = sistema.crear_reserva(
+        id_reserva="RES-02",
+        id_cliente="CLI-02",
+        id_servicio="SRV-EQ-1",
+        unidades=2,
+        cantidad=4,
+        cantidad_equipos=4,
+    )
+    sistema.confirmar_reserva("RES-02")
+    print(
+        f"[OK 6] {res2.obtener_resumen()} | Stock restante laptops: {equipo_laptops.stock_disponible}"
+    )
+
+    # Operación 7 [VÁLIDA]: Crear y confirmar asesoría especializada urgente
+    res3 = sistema.crear_reserva(
+        id_reserva="RES-03",
+        id_cliente="CLI-01",
+        id_servicio="SRV-ASE-1",
+        unidades=2,
+        cantidad=1,
+        urgente=True,
+    )
+    sistema.confirmar_reserva("RES-03")
+    print(f"[OK 7] {res3.obtener_resumen()}")
+
+    # Operación 8 [INVÁLIDA]: Intentar reservar más equipos que el stock disponible (quedan 2)
+    try:
+        sistema.crear_reserva(
+            id_reserva="RES-04",
+            id_cliente="CLI-02",
+            id_servicio="SRV-EQ-1",
+            unidades=1,
+            cantidad=5,
+            cantidad_equipos=5,
+        )
+    except SoftwareFJError as exc:
+        print(f"[ERR 8 esperado] {exc}")
+
+    # Operación 9 [VÁLIDA]: Cancelar reserva confirmada de equipos y verificar liberación de stock
+    sistema.cancelar_reserva("RES-02")
+    print(
+        f"[OK 9] Reserva RES-02 cancelada ({res2.estado}) | "
+        f"Stock liberado laptops: {equipo_laptops.stock_disponible}"
+    )
+
+    # Operación 10 [INVÁLIDA]: Intentar confirmar una reserva ya cancelada
+    try:
+        sistema.confirmar_reserva("RES-02")
+    except SoftwareFJError as exc:
+        print(f"[ERR 10 esperado] {exc}")
+
+    # Operación 11 [INVÁLIDA]: Crear reserva con cliente inexistente
+    try:
+        sistema.crear_reserva(
+            id_reserva="RES-05",
+            id_cliente="CLI-999",
+            id_servicio="SRV-SALA-1",
+            unidades=1,
+            cantidad=5,
+        )
+    except SoftwareFJError as exc:
+        print(f"[ERR 11 esperado] {exc}")
+
+    # Operación 12 [VÁLIDA]: Ejecutar batería de pruebas de bordes y excepciones encadenadas
+    pruebas = ejecutar_pruebas_bordes(sistema)
+    exitosas = sum(1 for p in pruebas if p["estado"] == "OK")
+    print(f"[OK 12] Pruebas de bordes completadas: {exitosas}/{len(pruebas)} exitosas")
+
+    return sistema
