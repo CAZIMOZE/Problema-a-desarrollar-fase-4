@@ -479,3 +479,154 @@ class AlquilerEquipo(Servicio):
             f"Stock: {self.__stock_disponible}/{self.__stock_total} | "
             f"Seguro/unidad: ${self.__costo_seguro_unidad:,.2f}"
         )
+
+
+# Parte 9: SERVICIO ESPECIALIZADO ASESORÍA ESPECIALIZADA
+
+class AsesoriaEspecializada(Servicio):
+    #Servicio especializado para asesorías o consultorías técnicas.
+    #Hereda de Servicio e incorpora niveles de complejidad y recargos por urgencia.
+
+    MULTIPLICADORES_COMPLEJIDAD = {
+        "BASICA": 1.0,
+        "INTERMEDIA": 1.35,
+        "AVANZADA": 1.75,
+        "CRITICA": 2.25,
+    }
+
+    def __init__(
+        self,
+        id_servicio: str,
+        nombre: str,
+        tarifa_base: float,
+        nivel_complejidad: str = "BASICA",
+        recargo_urgencia: float = 0.25,
+        cupo_maximo_sesiones: int = 10,
+        disponible: bool = True,
+    ):
+        super().__init__(id_servicio, nombre, tarifa_base, disponible)
+
+        if not nivel_complejidad or not nivel_complejidad.strip():
+            raise ParametroFaltanteError("El nivel de complejidad de la asesoría es obligatorio.")
+
+        nivel_normalizado = nivel_complejidad.strip().upper()
+        if nivel_normalizado not in self.MULTIPLICADORES_COMPLEJIDAD:
+            opciones = ", ".join(self.MULTIPLICADORES_COMPLEJIDAD.keys())
+            raise DatosInvalidosError(
+                f"Nivel de complejidad '{nivel_complejidad}' no válido. Opciones permitidas: {opciones}."
+            )
+
+        if recargo_urgencia is None or recargo_urgencia < 0:
+            raise DatosInvalidosError(
+                "El porcentaje de recargo por urgencia no puede ser negativo."
+            )
+
+        if cupo_maximo_sesiones is None or cupo_maximo_sesiones <= 0:
+            raise DatosInvalidosError(
+                "El cupo máximo de sesiones para la asesoría debe ser mayor que cero."
+            )
+
+        self.__nivel_complejidad = nivel_normalizado
+        self.__recargo_urgencia = float(recargo_urgencia)
+        self.__cupo_maximo_sesiones = int(cupo_maximo_sesiones)
+        self.__sesiones_programadas = 0
+
+    @property
+    def nivel_complejidad(self) -> str:
+        return self.__nivel_complejidad
+
+    @property
+    def recargo_urgencia(self) -> float:
+        return self.__recargo_urgencia
+
+    @property
+    def cupo_maximo_sesiones(self) -> int:
+        return self.__cupo_maximo_sesiones
+
+    @property
+    def sesiones_programadas(self) -> int:
+        return self.__sesiones_programadas
+
+    def programar_sesion(self, cantidad_sesiones: int = 1) -> None:
+        #Registra sesiones programadas verificando primero la disponibilidad.
+        self.verificar_disponibilidad(cantidad_sesiones)
+        self.__sesiones_programadas += int(cantidad_sesiones)
+        if self.__sesiones_programadas >= self.__cupo_maximo_sesiones:
+            self.cambiar_disponibilidad(False)
+
+    def liberar_sesion(self, cantidad_sesiones: int = 1) -> None:
+        #Libera sesiones canceladas o finalizadas dentro del cupo registrado.
+        if cantidad_sesiones is None or cantidad_sesiones <= 0:
+            raise DatosInvalidosError("La cantidad de sesiones a liberar debe ser mayor que cero.")
+        if int(cantidad_sesiones) > self.__sesiones_programadas:
+            raise OperacionNoPermitidaError(
+                f"No se pueden liberar {cantidad_sesiones} sesiones: solo hay "
+                f"{self.__sesiones_programadas} programadas."
+            )
+        self.__sesiones_programadas -= int(cantidad_sesiones)
+        if self.__sesiones_programadas < self.__cupo_maximo_sesiones:
+            self.cambiar_disponibilidad(True)
+
+    def verificar_disponibilidad(self, cantidad: int = 1) -> bool:
+        #Verifica si la asesoría está activa y tiene cupo para la cantidad de sesiones solicitadas.
+        if cantidad is None or cantidad <= 0:
+            raise DatosInvalidosError("La cantidad de sesiones a consultar debe ser mayor que cero.")
+
+        cupo_restante = self.__cupo_maximo_sesiones - self.__sesiones_programadas
+        if not self.disponible or cupo_restante <= 0:
+            raise ServicioNoDisponibleError(
+                f"La asesoría '{self.nombre}' [ID: {self.id_entidad}] no tiene cupos disponibles."
+            )
+
+        if int(cantidad) > cupo_restante:
+            raise ServicioNoDisponibleError(
+                f"Cupo insuficiente para '{self.nombre}': disponibles {cupo_restante} sesiones, "
+                f"solicitadas {cantidad}."
+            )
+
+        return True
+
+    def calcular_costo(self, unidades: float, **kwargs) -> float:
+       #Calcula el costo total de la asesoría según horas/unidades (unidades),
+        #complejidad del servicio y recargo por urgencia.
+        #Soporta 'urgente' (bool), 'recargo_urgencia' (float) y 'descuento_porcentaje' (float).
+        if unidades is None or unidades <= 0:
+            raise DatosInvalidosError("La duración en horas de la asesoría debe ser mayor que cero.")
+
+        es_urgente = bool(kwargs.get("urgente", False))
+        porcentaje_urgencia = float(kwargs.get("recargo_urgencia", self.__recargo_urgencia))
+        if porcentaje_urgencia < 0:
+            raise CalculoInconsistenteError(
+                "El porcentaje de recargo por urgencia no puede ser negativo."
+            )
+
+        descuento_porcentaje = float(kwargs.get("descuento_porcentaje", 0.0))
+        if descuento_porcentaje < 0 or descuento_porcentaje >= 100:
+            raise CalculoInconsistenteError(
+                f"El porcentaje de descuento '{descuento_porcentaje}' es inconsistente."
+            )
+
+        factor_complejidad = self.MULTIPLICADORES_COMPLEJIDAD[self.__nivel_complejidad]
+        subtotal = float(unidades) * self.tarifa_base * factor_complejidad
+
+        if es_urgente:
+            subtotal += subtotal * porcentaje_urgencia
+
+        total = subtotal * (1 - (descuento_porcentaje / 100.0))
+
+        if total <= 0:
+            raise CalculoInconsistenteError(
+                "El cálculo del costo de la asesoría especializada produjo un valor no válido."
+            )
+
+        return round(total, 2)
+
+    def obtener_resumen(self) -> str:
+        #Retorna el resumen de la asesoría con complejidad, recargo por urgencia y cupo.
+        base_resumen = super().obtener_resumen()
+        return (
+            f"{base_resumen} | Tipo: Asesoría Especializada | "
+            f"Complejidad: {self.__nivel_complejidad} | "
+            f"Recargo urgencia: {self.__recargo_urgencia * 100:.0f}% | "
+            f"Sesiones: {self.__sesiones_programadas}/{self.__cupo_maximo_sesiones}"
+        )
