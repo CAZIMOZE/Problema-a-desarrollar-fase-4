@@ -9,20 +9,20 @@ El desarrollo del sistema en `Fase4.py` está estructurado de forma incremental 
 ### Bloque 1: Cimientos, Logs y Excepciones
 - [x] **Fase 1:** Inicialización del script `Fase4.py` e importación de librerías estándar (`abc`, `datetime`, `os`, `re`).
 - [x] **Fase 2:** Implementación de `GestorLogs` para persistencia de eventos y errores en `.log` usando `try/except/finally`.
-- [ ] **Fase 3:** Jerarquía de excepciones personalizadas (`SoftwareFJError` y 6 excepciones especializadas).
+- [x] **Fase 3:** Jerarquía de excepciones personalizadas (`SoftwareFJError` y 6 excepciones especializadas).
 
 ### Bloque 2: Abstracción y Entidades Base
-- [ ] **Fase 4:** Clase abstracta base `EntidadSistema` (`ABC`) con validaciones y resumen obligatorio.
-- [ ] **Fase 5:** Clase `Cliente` con encapsulación privada (`@property`) y validación estricta de datos personales.
+- [x] **Fase 4:** Clase abstracta base `EntidadSistema` (`ABC`) con validaciones y resumen obligatorio.
+- [x] **Fase 5:** Clase `Cliente` con encapsulación privada (`@property`) y validación estricta de datos personales.
 
 ### Bloque 3: Jerarquía de Servicios y Polimorfismo
-- [ ] **Fase 6:** Clase abstracta `Servicio` con métodos abstractos y sobrecarga simulada en el cálculo de costos.
-- [ ] **Fase 7:** Servicio especializado `ReservaSala` (capacidad y equipamiento audiovisual).
-- [ ] **Fase 8:** Servicio especializado `AlquilerEquipo` (control de stock y seguro obligatorio).
-- [ ] **Fase 9:** Servicio especializado `AsesoriaEspecializada` (niveles de complejidad y recargos por urgencia).
+- [x] **Fase 6:** Clase abstracta `Servicio` con métodos abstractos y sobrecarga simulada en el cálculo de costos.
+- [x] **Fase 7:** Servicio especializado `ReservaSala` (capacidad y equipamiento audiovisual).
+- [x] **Fase 8:** Servicio especializado `AlquilerEquipo` (control de stock y seguro obligatorio).
+- [x] **Fase 9:** Servicio especializado `AsesoriaEspecializada` (niveles de complejidad y recargos por urgencia).
 
 ### Bloque 4: Gestión de Reservas y Motor Central
-- [ ] **Fase 10:** Clase `Reserva` con control de estados (`PENDIENTE`, `CONFIRMADA`, `CANCELADA`) y encadenamiento de excepciones (`raise ... from ...`).
+- [x] **Fase 10:** Clase `Reserva` con control de estados (`PENDIENTE`, `CONFIRMADA`, `CANCELADA`) y encadenamiento de excepciones (`raise ... from ...`).
 - [ ] **Fase 11:** Motor central `SistemaSoftwareFJ` para administración de listas en memoria y control de integridad.
 - [ ] **Fase 12:** Pruebas de bordes y verificación de captura de excepciones encadenadas en el archivo `.log`.
 
