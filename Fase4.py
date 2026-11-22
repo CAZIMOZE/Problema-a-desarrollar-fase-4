@@ -630,3 +630,140 @@ class AsesoriaEspecializada(Servicio):
             f"Recargo urgencia: {self.__recargo_urgencia * 100:.0f}% | "
             f"Sesiones: {self.__sesiones_programadas}/{self.__cupo_maximo_sesiones}"
         )
+
+
+# FASE 10: CLASE RESERVA (CONTROL DE ESTADOS Y ENCADENAMIENTO DE EXCEPCIONES)
+
+class Reserva:
+    #Representa una reserva de servicio realizada por un cliente dentro de Software FJ.
+    #Gestiona el ciclo de vida de estados y encadena excepciones con 'raise ... from ...'.
+
+    ESTADOS_VALIDOS = ("PENDIENTE", "CONFIRMADA", "CANCELADA")
+
+    def __init__(
+        self,
+        id_reserva: str,
+        cliente: Cliente,
+        servicio: Servicio,
+        unidades: float,
+        cantidad: int = 1,
+        **parametros_costo,
+    ):
+        if not id_reserva or not id_reserva.strip():
+            raise ParametroFaltanteError("El identificador de la reserva es obligatorio.")
+
+        if not isinstance(cliente, Cliente):
+            raise DatosInvalidosError("La reserva requiere una instancia válida de Cliente.")
+
+        if not isinstance(servicio, Servicio):
+            raise DatosInvalidosError("La reserva requiere una instancia válida de Servicio.")
+
+        if unidades is None or unidades <= 0:
+            raise ReservaInvalidaError("Las unidades o duración de la reserva deben ser mayores que cero.")
+
+        if cantidad is None or cantidad <= 0:
+            raise ReservaInvalidaError("La cantidad solicitada en la reserva debe ser mayor que cero.")
+
+        self.__id_reserva = id_reserva.strip()
+        self.__cliente = cliente
+        self.__servicio = servicio
+        self.__unidades = float(unidades)
+        self.__cantidad = int(cantidad)
+        self.__parametros_costo = dict(parametros_costo)
+        self.__estado = "PENDIENTE"
+
+        try:
+            self.__servicio.verificar_disponibilidad(self.__cantidad)
+            self.__costo_total = self.__servicio.calcular_costo(
+                self.__unidades, **self.__parametros_costo
+            )
+        except SoftwareFJError as exc:
+            raise ReservaInvalidaError(
+                f"No fue posible crear la reserva '{self.__id_reserva}' para el cliente "
+                f"'{self.__cliente.nombre}' en el servicio '{self.__servicio.nombre}'."
+            ) from exc
+
+    @property
+    def id_reserva(self) -> str:
+        return self.__id_reserva
+
+    @property
+    def cliente(self) -> Cliente:
+        return self.__cliente
+
+    @property
+    def servicio(self) -> Servicio:
+        return self.__servicio
+
+    @property
+    def unidades(self) -> float:
+        return self.__unidades
+
+    @property
+    def cantidad(self) -> int:
+        return self.__cantidad
+
+    @property
+    def estado(self) -> str:
+        return self.__estado
+
+    @property
+    def costo_total(self) -> float:
+        return self.__costo_total
+
+    def confirmar(self) -> None:
+        #Confirma una reserva pendiente y aplica el consumo correspondiente en el servicio.
+        if self.__estado == "CONFIRMADA":
+            raise OperacionNoPermitidaError(
+                f"La reserva '{self.__id_reserva}' ya se encuentra CONFIRMADA."
+            )
+        if self.__estado == "CANCELADA":
+            raise OperacionNoPermitidaError(
+                f"No se puede confirmar la reserva '{self.__id_reserva}' porque está CANCELADA."
+            )
+
+        try:
+            self.__servicio.verificar_disponibilidad(self.__cantidad)
+            self.__costo_total = self.__servicio.calcular_costo(
+                self.__unidades, **self.__parametros_costo
+            )
+
+            if isinstance(self.__servicio, AlquilerEquipo):
+                self.__servicio.reservar_unidades(self.__cantidad)
+            elif isinstance(self.__servicio, AsesoriaEspecializada):
+                self.__servicio.programar_sesion(self.__cantidad)
+
+            self.__estado = "CONFIRMADA"
+        except SoftwareFJError as exc:
+            raise ReservaInvalidaError(
+                f"Error al confirmar la reserva '{self.__id_reserva}'."
+            ) from exc
+
+    def cancelar(self) -> None:
+        #Cancela una reserva activa y libera recursos si ya había sido confirmada.
+        if self.__estado == "CANCELADA":
+            raise OperacionNoPermitidaError(
+                f"La reserva '{self.__id_reserva}' ya se encuentra CANCELADA."
+            )
+
+        try:
+            if self.__estado == "CONFIRMADA":
+                if isinstance(self.__servicio, AlquilerEquipo):
+                    self.__servicio.liberar_unidades(self.__cantidad)
+                elif isinstance(self.__servicio, AsesoriaEspecializada):
+                    self.__servicio.liberar_sesion(self.__cantidad)
+
+            self.__estado = "CANCELADA"
+        except SoftwareFJError as exc:
+            raise OperacionNoPermitidaError(
+                f"No fue posible cancelar limpiamente la reserva '{self.__id_reserva}'."
+            ) from exc
+
+    def obtener_resumen(self) -> str:
+        #Retorna un resumen legible del estado y costo de la reserva.
+        return (
+            f"Reserva [ID: {self.__id_reserva}] | Estado: {self.__estado} | "
+            f"Cliente: {self.__cliente.nombre} ({self.__cliente.id_entidad}) | "
+            f"Servicio: {self.__servicio.nombre} | Unidades: {self.__unidades} | "
+            f"Cantidad: {self.__cantidad} | Total: ${self.__costo_total:,.2f}"
+        )
