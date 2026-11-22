@@ -185,3 +185,59 @@ class Cliente(EntidadSistema):
         #Implementación obligatoria del método abstracto de EntidadSistema."""
         return (f"Cliente [ID: {self.id_entidad}] | Nombre: {self.__nombre} | "
                 f"Correo: {self.__correo} | Teléfono: {self.__telefono}")
+
+
+# Parte 6: CLASE ABSTRACTA SERVICIO (BASE PARA SERVICIOS ESPECIALIZADOS)
+
+class Servicio(EntidadSistema):
+    
+    #Clase abstracta base para los servicios ofrecidos por Software FJ.
+    #Hereda de EntidadSistema y establece la interfaz común de costos y disponibilidad.
+   
+    def __init__(self, id_servicio: str, nombre: str, tarifa_base: float, disponible: bool = True):
+        super().__init__(id_servicio)
+
+        if not nombre or not nombre.strip():
+            raise ParametroFaltanteError("El nombre del servicio es obligatorio.")
+        self.__nombre = nombre.strip()
+
+        if tarifa_base is None or tarifa_base <= 0:
+            raise DatosInvalidosError(
+                f"La tarifa base del servicio '{self.__nombre}' debe ser mayor que cero."
+            )
+        self.__tarifa_base = float(tarifa_base)
+        self.__disponible = bool(disponible)
+
+    @property
+    def nombre(self) -> str:
+        return self.__nombre
+
+    @property
+    def tarifa_base(self) -> float:
+        return self.__tarifa_base
+
+    @property
+    def disponible(self) -> bool:
+        return self.__disponible
+
+    def cambiar_disponibilidad(self, estado: bool) -> None:
+        #Actualiza de forma controlada si el servicio está disponible o no."""
+        self.__disponible = bool(estado)
+
+    @abstractmethod
+    def verificar_disponibilidad(self, cantidad: int = 1) -> bool:
+        #Verifica si el servicio puede atender la cantidad/cupo solicitada."""
+        pass
+
+    @abstractmethod
+    def calcular_costo(self, unidades: float, **kwargs) -> float:
+        #Calcula el costo total de un servicio.
+        #Soporta argumentos adicionales (kwargs) para simular sobrecarga según el servicio.
+       
+        pass
+
+    def obtener_resumen(self) -> str:
+        #Implementación obligatoria del método abstracto de EntidadSistema.
+        estado_texto = "Disponible" if self.__disponible else "No disponible"
+        return (f"Servicio [ID: {self.id_entidad}] | Nombre: {self.__nombre} | "
+                f"Tarifa base: ${self.__tarifa_base:,.2f} | Estado: {estado_texto}")
