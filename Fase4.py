@@ -241,3 +241,106 @@ class Servicio(EntidadSistema):
         estado_texto = "Disponible" if self.__disponible else "No disponible"
         return (f"Servicio [ID: {self.id_entidad}] | Nombre: {self.__nombre} | "
                 f"Tarifa base: ${self.__tarifa_base:,.2f} | Estado: {estado_texto}")
+
+
+# Parte 7: SERVICIO ESPECIALIZADO RESERVA DE SALA
+
+class ReservaSala(Servicio):
+    #Servicio especializado para la reserva de salas de reuniones, conferencias o talleres.
+    #Hereda de Servicio e incorpora control de capacidad y equipamiento audiovisual.
+ 
+    def __init__(
+        self,
+        id_servicio: str,
+        nombre: str,
+        tarifa_base: float,
+        capacidad_maxima: int,
+        tiene_audiovisual: bool = False,
+        recargo_audiovisual: float = 0.15,
+        disponible: bool = True,
+    ):
+        super().__init__(id_servicio, nombre, tarifa_base, disponible)
+
+        if capacidad_maxima is None or capacidad_maxima <= 0:
+            raise DatosInvalidosError(
+                f"La capacidad máxima de la sala '{self.nombre}' debe ser mayor que cero."
+            )
+        if recargo_audiovisual < 0:
+            raise DatosInvalidosError(
+                "El porcentaje de recargo por equipo audiovisual no puede ser negativo."
+            )
+
+        self.__capacidad_maxima = int(capacidad_maxima)
+        self.__tiene_audiovisual = bool(tiene_audiovisual)
+        self.__recargo_audiovisual = float(recargo_audiovisual)
+
+    @property
+    def capacidad_maxima(self) -> int:
+        return self.__capacidad_maxima
+
+    @property
+    def tiene_audiovisual(self) -> bool:
+        return self.__tiene_audiovisual
+
+    @property
+    def recargo_audiovisual(self) -> float:
+        return self.__recargo_audiovisual
+
+    def verificar_disponibilidad(self, cantidad: int = 1) -> bool:
+        #rifica si la sala está disponible y soporta la cantidad de asistentes solicitada.
+        if cantidad is None or cantidad <= 0:
+            raise DatosInvalidosError("La cantidad de asistentes para la sala debe ser mayor que cero.")
+
+        if not self.disponible:
+            raise ServicioNoDisponibleError(
+                f"La sala '{self.nombre}' [ID: {self.id_entidad}] no se encuentra disponible."
+            )
+
+        if cantidad > self.__capacidad_maxima:
+            raise ServicioNoDisponibleError(
+                f"La sala '{self.nombre}' admite máximo {self.__capacidad_maxima} personas "
+                f"(solicitadas: {cantidad})."
+            )
+
+        return True
+
+    def calcular_costo(self, unidades: float, **kwargs) -> float:
+#        Calcula el costo total de la reserva de sala según horas (unidades).
+        #Soporta 'incluir_audiovisual' (bool) y 'descuento_porcentaje' (float) vía kwargs.
+        if unidades is None or unidades <= 0:
+            raise DatosInvalidosError("La cantidad de horas de reserva debe ser mayor que cero.")
+
+        incluir_audiovisual = bool(kwargs.get("incluir_audiovisual", self.__tiene_audiovisual))
+        descuento_porcentaje = float(kwargs.get("descuento_porcentaje", 0.0))
+
+        if descuento_porcentaje < 0 or descuento_porcentaje >= 100:
+            raise CalculoInconsistenteError(
+                f"El porcentaje de descuento '{descuento_porcentaje}' es inconsistente."
+            )
+
+        subtotal = float(unidades) * self.tarifa_base
+
+        if incluir_audiovisual:
+            if not self.__tiene_audiovisual and kwargs.get("incluir_audiovisual") is True:
+                raise OperacionNoPermitidaError(
+                    f"La sala '{self.nombre}' no cuenta con equipamiento audiovisual instalado."
+                )
+            subtotal += subtotal * self.__recargo_audiovisual
+
+        total = subtotal * (1 - (descuento_porcentaje / 100.0))
+
+        if total <= 0:
+            raise CalculoInconsistenteError(
+                "El cálculo del costo de la reserva de sala produjo un valor no válido."
+            )
+
+        return round(total, 2)
+
+    def obtener_resumen(self) -> str:
+        #Retorna el resumen detallado de la sala incluyendo capacidad y audiovisual.
+        av_texto = "Con audiovisual" if self.__tiene_audiovisual else "Sin audiovisual"
+        base_resumen = super().obtener_resumen()
+        return (
+            f"{base_resumen} | Tipo: Reserva de Sala | "
+            f"Capacidad: {self.__capacidad_maxima} personas | {av_texto}"
+        )
